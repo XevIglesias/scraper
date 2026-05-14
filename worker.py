@@ -72,53 +72,99 @@ Responde SOLO con este JSON:
         }
 
 
+_SELECTORES_PRECIO = [
+    # Amazon
+    ".a-price.priceToPay .a-offscreen", ".a-price .a-offscreen", "#priceblock_ourprice",
+    # Genéricos schema
+    "[itemprop='price']", "[data-price]", "[data-product-price]",
+    # WooCommerce / PrestaShop / Shopify
+    ".price ins .amount", ".price .amount", ".woocommerce-Price-amount",
+    ".product-price", ".current-price", ".price-current", ".js-price",
+    ".product__price", ".ProductMeta__Price", ".price__current",
+    # Tiendas españolas
+    ".pvp", ".precio", ".importe", ".precio-actual", ".price-box .price",
+    ".pdp-price", ".buybox-price", ".js-product-price",
+    # Fallback genérico
+    ".price", ".our-price", "span.price", "#price",
+]
+
+
+def _parsear_precio(texto: str) -> float | None:
+    txt = texto.strip().replace("\xa0", "").replace(" ", "")
+    # Formato europeo: 1.299,99 → 1299.99
+    m = re.search(r"(\d{1,3}(?:\.\d{3})*),(\d{2})", txt)
+    if m:
+        return float(m.group(0).replace(".", "").replace(",", "."))
+    # Formato con punto decimal: 1299.99
+    m = re.search(r"\d+\.\d{2}", txt)
+    if m:
+        return float(m.group(0))
+    # Solo dígitos con coma
+    m = re.search(r"\d+,\d+", txt)
+    if m:
+        return float(m.group(0).replace(",", "."))
+    return None
+
+
 async def _extraer_precio_url(url: str, producto: str) -> dict | None:
     """Extrae precio de una URL usando Playwright + selectores estándar."""
     try:
         from playwright.async_api import async_playwright
         async with async_playwright() as pw:
-            browser = await pw.chromium.launch(headless=True)
+            browser = await pw.chromium.launch(headless=True, args=["--no-sandbox"])
             page = await browser.new_page()
-            await page.goto(url, timeout=15000, wait_until="domcontentloaded")
+            await page.set_extra_http_headers({"Accept-Language": "es-ES,es;q=0.9"})
+            await page.goto(url, timeout=20000, wait_until="domcontentloaded")
 
-            # JSON-LD primero
-            ld = await page.evaluate("""() => {
-                const s = document.querySelector('script[type="application/ld+json"]');
-                return s ? s.textContent : null;
-            }""")
             precio = None
             nombre = None
-            if ld:
+
+            # 1. JSON-LD (más fiable, resiste cambios de DOM)
+            lds = await page.evaluate("""() => {
+                return Array.from(document.querySelectorAll('script[type="application/ld+json"]'))
+                    .map(s => s.textContent);
+            }""")
+            for ld_text in lds:
                 try:
-                    data = json.loads(ld)
+                    data = json.loads(ld_text)
                     if isinstance(data, list):
                         data = data[0]
                     offers = data.get("offers", data)
                     if isinstance(offers, list):
                         offers = offers[0]
-                    precio = float(str(offers.get("price", "0")).replace(",", "."))
-                    nombre = data.get("name", producto)
+                    p = offers.get("price") or offers.get("lowPrice")
+                    if p:
+                        precio = float(str(p).replace(",", "."))
+                        nombre = data.get("name", producto)
+                        break
                 except Exception:
-                    pass
+                    continue
 
-            # Selectores CSS fallback
+            # 2. Atributo content en meta / span
             if not precio:
-                for sel in [".a-price .a-offscreen", ".price", "[itemprop='price']",
-                             ".product-price", ".pvp", ".our-price", "#priceblock_ourprice"]:
+                p = await page.evaluate("""() => {
+                    const el = document.querySelector('[itemprop="price"]');
+                    return el ? (el.getAttribute('content') || el.textContent) : null;
+                }""")
+                if p:
+                    precio = _parsear_precio(str(p))
+
+            # 3. Selectores CSS en cascada
+            if not precio:
+                for sel in _SELECTORES_PRECIO:
                     try:
                         el = await page.query_selector(sel)
                         if el:
                             txt = await el.inner_text()
-                            m = re.search(r"[\d]+[.,][\d]+", txt.replace(".", "").replace(",", "."))
-                            if m:
-                                precio = float(m.group(0))
+                            precio = _parsear_precio(txt)
+                            if precio:
                                 break
                     except Exception:
                         continue
 
             await browser.close()
 
-            if precio and precio > 0.5:
+            if precio and 1.0 < precio < 100000:
                 return {
                     "url": url,
                     "nombre_detectado": nombre or producto,
@@ -137,7 +183,7 @@ async def _buscar_producto(producto: str) -> list[dict]:
     motor = MotorCascada()
     urls = motor.buscar(plan.get("queries_busqueda", [producto]), producto=producto, buscar_nuevo=True)
 
-    tasks = [_extraer_precio_url(url, producto) for url in urls[:5]]
+    tasks = [_extraer_precio_url(url, producto) for url in urls[:12]]
     resultados = await asyncio.gather(*tasks, return_exceptions=True)
     return [r for r in resultados if r and not isinstance(r, Exception)]
 
