@@ -122,105 +122,102 @@ def _parsear_precio(texto: str) -> float | None:
     return None
 
 
-async def _extraer_precio_url(url: str, producto: str) -> dict | None:
-    """Extrae precio usando parser especializado si existe, o genérico como fallback."""
+async def _analizar_pagina(browser, url: str, producto: str) -> dict | None:
+    """Analiza una URL con un browser compartido — parser especializado o genérico."""
+    page = None
     try:
-        from playwright.async_api import async_playwright
         dom = _dominio(url)
-        async with async_playwright() as pw:
-            browser = await pw.chromium.launch(headless=True, args=["--no-sandbox"])
-            page = await browser.new_page()
-            await page.set_extra_http_headers({"Accept-Language": "es-ES,es;q=0.9"})
-            await page.goto(url, timeout=20000, wait_until="domcontentloaded")
+        page = await browser.new_page()
+        await page.set_extra_http_headers({"Accept-Language": "es-ES,es;q=0.9"})
+        await page.goto(url, timeout=20000, wait_until="domcontentloaded")
 
-            # Parser especializado si existe para este dominio
-            if dom in _PARSERS:
-                try:
-                    r = await _PARSERS[dom].parse(page)
-                    await browser.close()
-                    if r.precio > 0:
-                        return {
-                            "url": url,
-                            "nombre_detectado": r.nombre or producto,
-                            "precio_eur": r.precio,
-                            "envio_eur": r.envio if r.envio >= 0 else 0.0,
-                            "total_eur": r.precio + (r.envio if r.envio > 0 else 0.0),
-                            "stock_label": "✅ " + r.stock_label,
-                        }
-                    await browser.close()
-                    return None
-                except Exception as e:
-                    log.debug(f"[WORKER] Parser {dom} falló: {e}")
+        # Parser especializado
+        if dom in _PARSERS:
+            r = await _PARSERS[dom].parse(page)
+            if r.precio > 0:
+                return {
+                    "url": url,
+                    "nombre_detectado": r.nombre or producto,
+                    "precio_eur": r.precio,
+                    "envio_eur": max(r.envio, 0.0),
+                    "total_eur": r.precio + max(r.envio, 0.0),
+                    "stock_label": "✅ " + r.stock_label,
+                }
+            return None
 
-            precio = None
-            nombre = None
+        # Fallback genérico: JSON-LD → itemprop → selectores CSS
+        precio = None
+        nombre = None
 
-            # 1. JSON-LD (más fiable, resiste cambios de DOM)
-            lds = await page.evaluate("""() => {
-                return Array.from(document.querySelectorAll('script[type="application/ld+json"]'))
-                    .map(s => s.textContent);
+        lds = await page.evaluate("""() =>
+            Array.from(document.querySelectorAll('script[type="application/ld+json"]'))
+                .map(s => s.textContent)
+        """)
+        for ld_text in lds:
+            try:
+                data = json.loads(ld_text)
+                if isinstance(data, list):
+                    data = data[0]
+                offers = data.get("offers", data)
+                if isinstance(offers, list):
+                    offers = offers[0]
+                p = offers.get("price") or offers.get("lowPrice")
+                if p:
+                    precio = float(str(p).replace(",", "."))
+                    nombre = data.get("name", producto)
+                    break
+            except Exception:
+                continue
+
+        if not precio:
+            p = await page.evaluate("""() => {
+                const el = document.querySelector('[itemprop="price"]');
+                return el ? (el.getAttribute('content') || el.textContent) : null;
             }""")
-            for ld_text in lds:
+            if p:
+                precio = _parsear_precio(str(p))
+
+        if not precio:
+            for sel in _SELECTORES_PRECIO:
                 try:
-                    data = json.loads(ld_text)
-                    if isinstance(data, list):
-                        data = data[0]
-                    offers = data.get("offers", data)
-                    if isinstance(offers, list):
-                        offers = offers[0]
-                    p = offers.get("price") or offers.get("lowPrice")
-                    if p:
-                        precio = float(str(p).replace(",", "."))
-                        nombre = data.get("name", producto)
-                        break
+                    el = await page.query_selector(sel)
+                    if el:
+                        precio = _parsear_precio(await el.inner_text())
+                        if precio:
+                            break
                 except Exception:
                     continue
 
-            # 2. Atributo content en meta / span
-            if not precio:
-                p = await page.evaluate("""() => {
-                    const el = document.querySelector('[itemprop="price"]');
-                    return el ? (el.getAttribute('content') || el.textContent) : null;
-                }""")
-                if p:
-                    precio = _parsear_precio(str(p))
-
-            # 3. Selectores CSS en cascada
-            if not precio:
-                for sel in _SELECTORES_PRECIO:
-                    try:
-                        el = await page.query_selector(sel)
-                        if el:
-                            txt = await el.inner_text()
-                            precio = _parsear_precio(txt)
-                            if precio:
-                                break
-                    except Exception:
-                        continue
-
-            await browser.close()
-
-            if precio and 1.0 < precio < 100000:
-                return {
-                    "url": url,
-                    "nombre_detectado": nombre or producto,
-                    "precio_eur": precio,
-                    "envio_eur": 0.0,
-                    "total_eur": precio,
-                    "stock_label": "✅ En stock",
-                }
+        if precio and 1.0 < precio < 100000:
+            return {
+                "url": url,
+                "nombre_detectado": nombre or producto,
+                "precio_eur": precio,
+                "envio_eur": 0.0,
+                "total_eur": precio,
+                "stock_label": "✅ En stock",
+            }
     except Exception as e:
-        log.debug(f"[WORKER] Error extrayendo {url}: {e}")
+        log.debug(f"[WORKER] Error {url}: {e}")
+    finally:
+        if page:
+            await page.close()
     return None
 
 
 async def _buscar_producto(producto: str) -> list[dict]:
+    """Busca un producto reutilizando un solo browser para todas las URLs."""
+    from playwright.async_api import async_playwright
     plan = await _planificar(producto)
     motor = MotorCascada()
     urls = motor.buscar(plan.get("queries_busqueda", [producto]), producto=producto, buscar_nuevo=True)
 
-    tasks = [_extraer_precio_url(url, producto) for url in urls[:12]]
-    resultados = await asyncio.gather(*tasks, return_exceptions=True)
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True, args=["--no-sandbox"])
+        tasks = [_analizar_pagina(browser, url, producto) for url in urls[:10]]
+        resultados = await asyncio.gather(*tasks, return_exceptions=True)
+        await browser.close()
+
     return [r for r in resultados if r and not isinstance(r, Exception)]
 
 
