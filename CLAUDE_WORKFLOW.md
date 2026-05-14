@@ -10,15 +10,42 @@ tests que verifican cada cambio, UI que no tiene bugs visuales, código modular.
 Sin cimientos, cualquier innovación se derrumba.
 
 **Modo Vanguardia** (fitness > 80/100):
-Una vez sólida la base, ser pionero. Esto significa:
-- Ingeniería inversa de los mejores scrapers open source (Scrapy, Playwright-stealth, price-tracker repos en GitHub)
-- Buscar qué hacen los líderes del sector (Idealo, CamelCamelCamel, Keepa) y replicar lo mejor
-- Proponer mejoras que no existen todavía: parsing semántico con LLM como fallback, detección automática de cambios de DOM, alertas predictivas de precio
+Una vez sólida la base, el salto es convertir la app de escritorio a web.
+Conclusión de ingeniería inversa de competidores (Idealo, CamelCamelCamel, Keepa):
+TODOS son web. Una app de escritorio no escala, no se comparte, no funciona en móvil.
+
+**Objetivo de vanguardia: migrar a FastAPI + frontend web**
+1. FastAPI como backend — la lógica de scraping (Playwright, parsers, DB) se mueve tal cual
+2. Frontend moderno — HTML/CSS con HTMX o React para los resultados en tiempo real
+3. Deploy local primero, luego servidor si se quiere compartir
+
+Hasta llegar ahí: parsers resistentes, historial de precios, alertas funcionales.
 
 **Retroalimentación tipo Deep Learning**:
 Cada sesión termina con una medición de fitness. La siguiente sesión lee ese resultado
 y ajusta la estrategia — igual que gradient descent. Lo que funcionó: más de eso.
 Lo que falló 2 veces: descartar y probar otro enfoque. Nunca repetir un error.
+
+---
+
+## REGLA CRÍTICA: Gestión de tokens y cambio de conversación
+
+Soy yo quien decide cuándo parar, no el usuario. Reglas obligatorias:
+
+- **Al llegar al 50% del contexto** → aviso: "Vamos por la mitad del contexto. Termino esta tarea y migramos."
+- **Al llegar al 70%** → PARO lo que sea, creo CHECKPOINT.md y digo: "Contexto al 70%. Crea una conversación nueva y pega esto."
+- **Nunca espero a que el usuario lo pida.** Si veo que una tarea va a consumir mucho contexto antes de empezar, lo digo primero.
+- **Uso subagentes** (Agent tool) cuando necesito hacer investigación larga sin saturar el contexto principal. El subagente trabaja en paralelo y me devuelve solo el resumen.
+
+### CHECKPOINT.md (plantilla)
+```
+# Checkpoint — [fecha]
+Fitness: [X]/100
+Git hash: [git rev-parse HEAD]
+Última tarea completada: [descripción]
+Próxima tarea: [descripción exacta, con archivo y función si aplica]
+Contexto importante: [lo que no está en el código ni en el git log]
+```
 
 ---
 
