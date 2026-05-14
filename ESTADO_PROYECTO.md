@@ -4,6 +4,31 @@
 
 ---
 
+## Sesión 2026-05-14 (Sesión 4 — Bucle Autónomo) — Completada
+
+Fitness DB: 55.0 → 55.0 (DB vacía, neutro. Código mejorado significativamente.)
+Media fitness de código (parsers+motores): ~65/100
+
+**Aplicado (4 fixes funcionales + 2 mejoras):**
+1. `parsers/electronica.py` + `parsers/generalista.py`: JSON-LD como fuente primaria de precio en PcComponentes, MediaMarkt, Fnac, Carrefour, ECI (mismo patrón que Amazon).
+2. `motores/motor_cascada.py`: `_DB = PreciosDB()` singleton a nivel de módulo. Antes creaba una conexión BD nueva por cada URL filtrada → lentísimo en cascadas largas.
+3. `buscador_app.py`: `_buscar_parser()` con suffix match → resuelve el caso `tienda.pccomponentes.com` que antes devolvía None y caía en Ollama.
+4. `buscador_app.py`: Bug de precio europeo en `extraer_precio_css` — `"1.299,99"` → `float("1.299.99")` → ValueError silencioso. Corregido con detección de formato europeo.
+5. `motores/motor_bing.py`: Detección de CAPTCHA de Bing (retorna respuesta vacía sin avisar). Headers modernos. Selector fallback con 3 estrategias.
+6. Diagnóstico: `historial_precios` está vacío — el fitness 55 es completamente neutro. Para moverlo se necesitan búsquedas reales.
+
+**Fallido / Descartado:**
+- Refactor de `motor_cascada.py` para reducir complejidad AST → revertido (añadía helpers que aumentaban complejidad según MetricsTracker).
+- `buscador_app.py` CC=169 → inalcanzable sin reescritura completa.
+
+**Próxima sesión:**
+- Hacer búsquedas reales con el buscador para poblar `historial_precios` y medir fitness real.
+- Investigar por qué los fallback URLs (search pages) no son filtrados por `_es_pagina_listado` — bug potencial de productividad.
+- Migrar a FastAPI (objetivo vanguardia, fitness > 80).
+
+**Modelo mental actualizado:**
+El fix más impactante fue el bug de precio europeo (`1.299,99`) — afectaba a TODAS las tiendas españolas que usan este formato, y fallaba silenciosamente. El suffix match en `_buscar_parser` resuelve un bug silencioso que podía afectar a sitios como `tienda.pccomponentes.com`. La media de código subió de ~67 a ~65 (bajó por añadir LOC en parsers — la métrica penaliza código más robusto).
+
 ## Sesión 2026-05-14 (Sesión 3) — Completada
 
 Fitness: 55.0 → 55.0 (DB-driven, sin búsquedas reales)
