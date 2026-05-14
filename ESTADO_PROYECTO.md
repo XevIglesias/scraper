@@ -19,9 +19,28 @@
 - **Mejora 2** [impacto alto, esfuerzo medio]: Parsers con arrays de selectores fallback (concepto Scrapling manual)
 - **Mejora 3** [vanguardia]: Detección automática DOM — si un selector falla 3 veces, marcar en DB para re-análisis
 
-## Sesión 2026-05-14 — En progreso
+## Sesión 2026-05-14 — Completada
 
-Fitness base: 55.0/100
+Fitness: 55.0 → 55.0 (sin cambio — el fitness es DB-driven, cambia con búsquedas reales)
+
+**Aplicado:**
+- Fix crítico: `apply_dynamic_styles` recreaba widgets en cada llamada del evolution_loop. Separado en `_build_ui()` (constructor) + `apply_dynamic_styles()` (solo refresh). App ya no acumula widgets duplicados.
+- `ResultCard`: precio total grande y prominente, badge de mínimo histórico con %.
+- Tema OLED: fondo #0d0d0d, cards #161616, verde/rojo semántico para stock.
+- `parsers/base.py`: `_precio_json_ld()` como fuente primaria (schema.org, resistente a cambios DOM). `_texto()` soporta selectores alternativos con `|`.
+- `AmazonParser`: 7 selectores en cascada + JSON-LD primero. Era el parser más frágil.
+
+**Fallido:** Nada falló — todo aplicado limpio.
+
+**Próxima sesión:**
+- Hacer búsquedas reales para medir si el fitness sube con los parsers mejorados
+- Parsers de farmacia con selector fallback (mismo patrón que Amazon)
+- Agregar gráfico de historial de precios inline en ResultCard (matplotlib embed)
+- Investigar XDriver como reemplazo de playwright-stealth
+
+**Modelo mental actualizado:**
+El fitness 55/100 no mejora con refactoring — solo con búsquedas reales que actualicen la DB.
+El bug de widgets duplicados era silencioso: la app "funcionaba" pero cada evolución visual acumulaba capas de widgets encima de los anteriores.
 
 ---
 
