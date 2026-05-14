@@ -36,55 +36,23 @@ async def startup():
 DB = PreciosDB()
 _motor = MotorCascada()
 
-# ── Búsqueda activa ──────────────────────────────────────────────────────────
-
-async def _analizar_urls(urls: list[str], plan: dict) -> list[dict]:
-    """Lanza Playwright headless y analiza cada URL."""
-    from buscador_app import analizar_url
-    resultados = []
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=True)
-        tasks = [
-            analizar_url(url, browser, plan, modo_barato=False, query_original=plan["producto_objetivo"],
-                         callback=lambda r: resultados.append(r), auto_aprendizaje=False)
-            for url in urls[:6]
-        ]
-        await asyncio.gather(*tasks, return_exceptions=True)
-        await browser.close()
-    return resultados
-
 
 @app.get("/buscar")
 async def buscar(
     q: str = Query(..., description="Producto a buscar"),
     nuevo: bool = Query(True, description="Solo productos nuevos"),
 ):
-    from buscador_app import planificar
-    plan = await planificar(q, modo_barato=False)
-    if not plan:
-        return {"error": "No se pudo planificar la búsqueda", "resultados": []}
+    from worker import _planificar, _buscar_producto
+    resultados = await _buscar_producto(q)
 
-    urls = _motor.buscar(plan.get("queries_busqueda", [q]), producto=q, buscar_nuevo=nuevo)
-    resultados = await _analizar_urls(urls, plan)
-
-    # Guardar en historial
     for r in resultados:
-        if r and r.get("precio_eur", 0) > 0:
-            DB.guardar_precio(
-                producto=r.get("nombre_detectado", q),
-                tienda=r.get("url", "").split("/")[2].replace("www.", ""),
-                precio=r.get("precio_eur", 0),
-                envio=r.get("envio_eur", 0),
-                url=r.get("url", ""),
-            )
+        if r.get("precio_eur", 0) > 0:
+            DB.guardar_resultado({"nombre_detectado": r.get("nombre_detectado", q), **r})
 
     return {
         "query": q,
         "total": len(resultados),
-        "resultados": sorted(
-            [r for r in resultados if r],
-            key=lambda x: x.get("total_eur", 9999)
-        )
+        "resultados": sorted(resultados, key=lambda x: x.get("total_eur", 9999))
     }
 
 
