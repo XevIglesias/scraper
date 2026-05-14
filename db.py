@@ -64,6 +64,18 @@ class PreciosDB:
                         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                     )
                 ''')
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS watchlist (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        producto TEXT NOT NULL,
+                        categoria TEXT DEFAULT 'electronica',
+                        intervalo_min INTEGER DEFAULT 360,
+                        activo INTEGER DEFAULT 1,
+                        ultima_busqueda DATETIME,
+                        total_busquedas INTEGER DEFAULT 0,
+                        total_errores INTEGER DEFAULT 0
+                    )
+                ''')
                 conn.commit()
 
     @staticmethod
@@ -272,3 +284,48 @@ class PreciosDB:
                 if res:
                     return {"selector_precio": res[0], "selector_nombre": res[1]}
         return None
+
+    # ── Watchlist ────────────────────────────────────────────────────────────
+
+    def watchlist_listar(self) -> list[dict]:
+        with self._lock:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    'SELECT * FROM watchlist WHERE activo = 1 ORDER BY id'
+                ).fetchall()
+                return [dict(r) for r in rows]
+
+    def watchlist_añadir(self, producto: str, categoria: str = "electronica", intervalo_min: int = 360) -> int:
+        with self._lock:
+            with sqlite3.connect(self.db_path) as conn:
+                cur = conn.execute(
+                    'INSERT INTO watchlist (producto, categoria, intervalo_min) VALUES (?, ?, ?)',
+                    (producto, categoria, intervalo_min)
+                )
+                conn.commit()
+                return cur.lastrowid
+
+    def watchlist_marcar_busqueda(self, id: int):
+        with self._lock:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute(
+                    'UPDATE watchlist SET ultima_busqueda = CURRENT_TIMESTAMP, total_busquedas = total_busquedas + 1 WHERE id = ?',
+                    (id,)
+                )
+                conn.commit()
+
+    def watchlist_marcar_error(self, id: int):
+        with self._lock:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute(
+                    'UPDATE watchlist SET total_errores = total_errores + 1 WHERE id = ?',
+                    (id,)
+                )
+                conn.commit()
+
+    def watchlist_desactivar(self, id: int):
+        with self._lock:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute('UPDATE watchlist SET activo = 0 WHERE id = ?', (id,))
+                conn.commit()

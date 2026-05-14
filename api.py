@@ -6,8 +6,13 @@ Endpoints:
   GET /alertas                        → lista alertas activas
   POST /alerta                        → crear alerta de precio
   GET /health                         → estado del servidor
+  GET /worker/status                  → estado del worker 24/7
+  GET /watchlist                      → productos monitorizados
+  POST /watchlist                     → añadir producto a watchlist
+  DELETE /watchlist/{id}              → desactivar producto de watchlist
 """
 import asyncio
+import logging
 from fastapi import FastAPI, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -16,9 +21,17 @@ from playwright.async_api import async_playwright
 
 from db import PreciosDB
 from motores.motor_cascada import MotorCascada
+from worker import run_worker, get_estado
 
-app = FastAPI(title="Comparador de Precios ES", version="1.0")
+logging.basicConfig(level=logging.INFO)
+
+app = FastAPI(title="Comparador de Precios ES", version="2.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+
+@app.on_event("startup")
+async def startup():
+    asyncio.create_task(run_worker())
 
 DB = PreciosDB()
 _motor = MotorCascada()
@@ -104,6 +117,35 @@ async def listar_alertas():
     return {"alertas": [{"producto": r[0], "precio_objetivo": r[1], "activa": r[2], "fecha": r[3]} for r in rows]}
 
 
+# ── Worker 24/7 + Watchlist ─────────────────────────────────────────────────
+
+@app.get("/worker/status")
+async def worker_status():
+    from replicator.core.scraper_fitness import ScraperFitness
+    fitness = ScraperFitness().calcular()
+    return {**get_estado(), "fitness": round(fitness, 1)}
+
+
+class WatchlistIn(BaseModel):
+    producto: str
+    categoria: str = "electronica"
+    intervalo_min: int = 360
+
+@app.get("/watchlist")
+async def watchlist_listar():
+    return {"watchlist": DB.watchlist_listar()}
+
+@app.post("/watchlist")
+async def watchlist_añadir(item: WatchlistIn):
+    id_ = DB.watchlist_añadir(item.producto, item.categoria, item.intervalo_min)
+    return {"ok": True, "id": id_, "producto": item.producto}
+
+@app.delete("/watchlist/{id}")
+async def watchlist_desactivar(id: int):
+    DB.watchlist_desactivar(id)
+    return {"ok": True}
+
+
 # ── Health + UI mínima ───────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -142,6 +184,7 @@ async def ui():
 </head>
 <body>
 <h1>🔍 Comparador de Precios España</h1>
+<div id="worker-bar" style="background:#111;border:1px solid #222;border-radius:8px;padding:10px;margin-bottom:20px;font-size:0.85rem;color:#666">Cargando estado del worker...</div>
 <div class="search-box">
   <input id="q" type="text" placeholder="Busca cualquier producto... (ej: iPhone 15 Pro Max 256GB nuevo)" />
   <button onclick="buscar()">Buscar</button>
@@ -171,6 +214,16 @@ async function buscar() {
   }
 }
 document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') buscar(); });
+async function cargarWorker() {
+  try {
+    const r = await fetch('/worker/status');
+    const d = await r.json();
+    document.getElementById('worker-bar').innerHTML =
+      `⚙️ Worker 24/7: <span style="color:#4CAF50">${d.activo ? 'ACTIVO' : 'inactivo'}</span> &nbsp;|&nbsp; Fitness: <b style="color:#4CAF50">${d.fitness}/100</b> &nbsp;|&nbsp; Búsquedas hoy: ${d.busquedas_hoy} &nbsp;|&nbsp; Último: ${d.ultimo_producto || '—'}`;
+  } catch(e) {}
+}
+cargarWorker();
+setInterval(cargarWorker, 30000);
 </script>
 </body>
 </html>
