@@ -100,7 +100,7 @@ class EvolutionEngine:
         for idx, opp in enumerate(opportunities[:_MAX_PER_CYCLE], 1):
             print(f"\n{'='*55}")
             print(f"[EvolutionEngine] Oportunidad {idx}/{min(len(opportunities), _MAX_PER_CYCLE)}: "
-                  f"{opp.target_file} → {opp.func_name} (prioridad {opp.priority})")
+                  f"{opp.target_file} -> {opp.func_name} (prioridad {opp.priority})")
             try:
                 await self._process_opportunity(opp)
             except Exception as exc:

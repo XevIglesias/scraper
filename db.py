@@ -113,6 +113,20 @@ class PreciosDB:
                     return {"total": res[0], "fecha": res[1], "tienda": res[2]}
         return None
 
+    def obtener_historial_precios(self, producto: str, limite: int = 30) -> list[dict]:
+        """Devuelve los últimos N precios registrados para un producto (por nombre parcial)."""
+        first_word = producto.strip().split()[0] if producto.strip() else producto
+        safe_word = first_word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        with self._lock:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT total, timestamp, tienda FROM historial_precios
+                    WHERE producto LIKE ? ESCAPE '\\' AND total > 1.0
+                    ORDER BY timestamp ASC LIMIT ?
+                ''', (f"%{safe_word}%", limite))
+                return [{"total": r[0], "fecha": r[1], "tienda": r[2]} for r in cursor.fetchall()]
+
     def crear_alerta(self, producto: str, precio_objetivo: float):
         """Crea una nueva alerta de precio."""
         with self._lock:

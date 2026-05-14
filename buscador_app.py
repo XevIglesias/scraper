@@ -12,6 +12,13 @@ from playwright.async_api import async_playwright
 from ollama import AsyncClient
 import customtkinter as ctk
 import webbrowser
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from io import BytesIO
+from datetime import datetime as _dt
+from PIL import Image
 from replicator.core.security import (
     sanitize_css_selector,
     validate_url,
@@ -522,14 +529,40 @@ async def analizar_url(url: str, browser, plan: dict, modo_barato: bool, query_o
 
 
 
+        import random as _random
+        _viewports = [
+            {"width": 1920, "height": 1080},
+            {"width": 1366, "height": 768},
+            {"width": 1440, "height": 900},
+            {"width": 1536, "height": 864},
+        ]
+        _agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        ]
         ctx = await browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            user_agent=_random.choice(_agents),
+            viewport=_random.choice(_viewports),
             java_script_enabled=True,
             bypass_csp=False,
+            locale="es-ES",
+            timezone_id="Europe/Madrid",
         )
-        # INYECCIÓN DE SEGURIDAD: Desactivar eval, Function, ServiceWorker y string-timers
+        # STEALTH: eliminar firma de Playwright + seguridad
         await ctx.add_init_script("""
             (function() {
+                // Ocultar navigator.webdriver (principal firma de bot)
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                // Simular plugins reales de Chrome
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5]
+                });
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['es-ES', 'es', 'en']
+                });
+                // Seguridad: desactivar eval y string-timers
                 window.eval = undefined;
                 window.Function = undefined;
                 window.ServiceWorker = undefined;
@@ -1109,6 +1142,16 @@ class ResultCard(ctk.CTkFrame):
                       font=("Consolas", 11), corner_radius=8,
                       command=lambda: self.ir_a_tienda(dato["url"])).pack(pady=3)
 
+        ctk.CTkButton(btn_frm, text="🔔 Alerta", width=110, height=30,
+                      font=("Consolas", 11), corner_radius=8,
+                      fg_color="#1a2a4a", hover_color="#1a4a8a",
+                      command=self.crear_alerta_ui).pack(pady=2)
+
+        ctk.CTkButton(btn_frm, text="📈 Historial", width=110, height=30,
+                      font=("Consolas", 11), corner_radius=8,
+                      fg_color="#1a1a3a", hover_color="#2a2a6a",
+                      command=self.mostrar_historial).pack(pady=2)
+
         fb_frm = ctk.CTkFrame(btn_frm, fg_color="transparent")
         fb_frm.pack(pady=2)
 
@@ -1136,9 +1179,59 @@ class ResultCard(ctk.CTkFrame):
         print(f"[*] Gracias por tu feedback ({'+1' if valor>0 else '-1'}). IA aprendiendo...")
 
 
-    def set_alert(self):
-        # Simplificado para este paso
-        print(f"[*] Alerta configurada para {self.dato.get('nombre_detectado')}")
+    def crear_alerta_ui(self):
+        nombre = self.dato.get("nombre_detectado", "Producto")
+        total  = self.dato.get("total_eur", 0)
+        dialog = ctk.CTkInputDialog(
+            text=f"Precio objetivo (€) para:\n{nombre[:60]}\n(Actual: {total:.2f}€)",
+            title="Crear alerta de precio"
+        )
+        valor = dialog.get_input()
+        if not valor:
+            return
+        try:
+            precio_obj = float(valor.replace(",", "."))
+            DB.crear_alerta(nombre, precio_obj)
+            print(f"[🔔] Alerta creada: {nombre[:40]} < {precio_obj:.2f}€")
+        except ValueError:
+            print("[!] Precio no válido para la alerta.")
+
+    def mostrar_historial(self):
+        nombre = self.dato.get("nombre_detectado", "Producto")
+        historial = DB.obtener_historial_precios(nombre, limite=30)
+        if len(historial) < 2:
+            print(f"[📈] Sin suficiente historial para {nombre[:40]} (necesita ≥2 entradas).")
+            return
+        try:
+            fechas  = [_dt.fromisoformat(h["fecha"]) for h in historial]
+            precios = [h["total"] for h in historial]
+
+            fig, ax = plt.subplots(figsize=(5, 2.5), facecolor="#0d0d0d")
+            ax.set_facecolor("#141414")
+            ax.plot(fechas, precios, color="#F0C040", linewidth=2, marker="o", markersize=4)
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m"))
+            ax.tick_params(colors="#888888", labelsize=8)
+            for spine in ax.spines.values():
+                spine.set_edgecolor("#333333")
+            ax.set_title(f"Historial: {nombre[:35]}", color="#aaaaaa", fontsize=9)
+            ax.set_ylabel("€", color="#888888", fontsize=8)
+            fig.tight_layout()
+
+            buf = BytesIO()
+            fig.savefig(buf, format="png", dpi=90, bbox_inches="tight")
+            plt.close(fig)
+            buf.seek(0)
+            img = Image.open(buf)
+
+            win = ctk.CTkToplevel(self)
+            win.title("Historial de precios")
+            win.geometry("520x280")
+            win.configure(fg_color="#0d0d0d")
+            ctk_img = ctk.CTkImage(light_image=img, dark_image=img,
+                                   size=(500, 250))
+            ctk.CTkLabel(win, image=ctk_img, text="").pack(padx=10, pady=10)
+        except Exception as e:
+            print(f"[!] Error mostrando historial: {e}")
 
 class RedirigirConsola:
     def __init__(self, tb): self.tb = tb
