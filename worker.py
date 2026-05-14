@@ -9,9 +9,25 @@ import logging
 import re
 from datetime import datetime, timedelta
 
+from urllib.parse import urlparse
 from ollama import AsyncClient
 from db import PreciosDB
 from motores.motor_cascada import MotorCascada
+from parsers.electronica import AmazonParser, PcComponentesParser, MediaMarktParser, FnacParser
+from parsers.generalista import CarrefourParser, ElCorteInglesParser
+
+_PARSERS = {
+    "amazon.es": AmazonParser(),
+    "pccomponentes.com": PcComponentesParser(),
+    "mediamarkt.es": MediaMarktParser(),
+    "fnac.es": FnacParser(),
+    "carrefour.es": CarrefourParser(),
+    "elcorteingles.es": ElCorteInglesParser(),
+}
+
+def _dominio(url: str) -> str:
+    h = urlparse(url).hostname or ""
+    return h[4:] if h.startswith("www.") else h
 
 log = logging.getLogger("worker")
 
@@ -107,14 +123,34 @@ def _parsear_precio(texto: str) -> float | None:
 
 
 async def _extraer_precio_url(url: str, producto: str) -> dict | None:
-    """Extrae precio de una URL usando Playwright + selectores estándar."""
+    """Extrae precio usando parser especializado si existe, o genérico como fallback."""
     try:
         from playwright.async_api import async_playwright
+        dom = _dominio(url)
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(headless=True, args=["--no-sandbox"])
             page = await browser.new_page()
             await page.set_extra_http_headers({"Accept-Language": "es-ES,es;q=0.9"})
             await page.goto(url, timeout=20000, wait_until="domcontentloaded")
+
+            # Parser especializado si existe para este dominio
+            if dom in _PARSERS:
+                try:
+                    r = await _PARSERS[dom].parse(page)
+                    await browser.close()
+                    if r.precio > 0:
+                        return {
+                            "url": url,
+                            "nombre_detectado": r.nombre or producto,
+                            "precio_eur": r.precio,
+                            "envio_eur": r.envio if r.envio >= 0 else 0.0,
+                            "total_eur": r.precio + (r.envio if r.envio > 0 else 0.0),
+                            "stock_label": "✅ " + r.stock_label,
+                        }
+                    await browser.close()
+                    return None
+                except Exception as e:
+                    log.debug(f"[WORKER] Parser {dom} falló: {e}")
 
             precio = None
             nombre = None
