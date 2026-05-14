@@ -317,11 +317,18 @@ async def extraer_precio_css(page) -> float | None:
             else:
                 val = await el.inner_text()
             if val:
-                # Limpiar el texto del precio
-                limpio = val.strip().replace('€','').replace(' ','').replace(',','.').split('\n')[0]
-                p = float(limpio)
-                if 0.5 < p < 100000:
-                    return p
+                # Limpiar el texto del precio con soporte de formato europeo (1.299,99)
+                limpio = val.strip().replace('€','').replace(' ','').split('\n')[0].strip()
+                if ',' in limpio and '.' in limpio:
+                    limpio = limpio.replace('.', '').replace(',', '.')
+                elif ',' in limpio:
+                    limpio = limpio.replace(',', '.')
+                try:
+                    p = float(limpio)
+                    if 0.5 < p < 100000:
+                        return p
+                except (ValueError, TypeError):
+                    continue
         except Exception:
             continue
 
