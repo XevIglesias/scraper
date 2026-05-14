@@ -114,6 +114,34 @@ async def watchlist_desactivar(id: int):
     return {"ok": True}
 
 
+# ── /evolve manual ──────────────────────────────────────────────────────────
+
+_evolve_corriendo = False
+
+async def _lanzar_evolve():
+    global _evolve_corriendo
+    if _evolve_corriendo:
+        return
+    _evolve_corriendo = True
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "python3", "replicator/run_evolution.py",
+            cwd="/opt/scraper",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        await proc.wait()
+    finally:
+        _evolve_corriendo = False
+
+@app.post("/evolve")
+async def evolve(background_tasks: BackgroundTasks):
+    if _evolve_corriendo:
+        return {"ok": False, "mensaje": "Ya hay un ciclo /evolve en curso"}
+    background_tasks.add_task(_lanzar_evolve)
+    return {"ok": True, "mensaje": "Ciclo /evolve iniciado — tarda ~5 minutos"}
+
+
 # ── Health + UI mínima ───────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -140,6 +168,9 @@ async def ui():
   input { flex: 1; padding: 12px; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 1rem; }
   button { padding: 12px 24px; background: #4CAF50; border: none; border-radius: 8px; color: #000; font-weight: bold; cursor: pointer; font-size: 1rem; }
   button:hover { background: #66BB6A; }
+  .btn-evolve { background: #1565C0; color: #fff; padding: 8px 16px; font-size: 0.85rem; border-radius: 6px; border: none; cursor: pointer; margin-left: 10px; }
+  .btn-evolve:hover { background: #1976D2; }
+  .btn-evolve:disabled { background: #333; color: #666; cursor: default; }
   .card { background: #161616; border: 1px solid #2a2a2a; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
   .precio { font-size: 1.8rem; font-weight: bold; color: #4CAF50; }
   .tienda { color: #888; font-size: 0.9rem; margin-top: 4px; }
@@ -152,7 +183,10 @@ async def ui():
 </head>
 <body>
 <h1>🔍 Comparador de Precios España</h1>
-<div id="worker-bar" style="background:#111;border:1px solid #222;border-radius:8px;padding:10px;margin-bottom:20px;font-size:0.85rem;color:#666">Cargando estado del worker...</div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+  <div id="worker-bar" style="flex:1;background:#111;border:1px solid #222;border-radius:8px;padding:10px;font-size:0.85rem;color:#666">Cargando estado del worker...</div>
+  <button class="btn-evolve" id="btn-evolve" onclick="lanzarEvolve()">⚡ /evolve</button>
+</div>
 <div class="search-box">
   <input id="q" type="text" placeholder="Busca cualquier producto... (ej: iPhone 15 Pro Max 256GB nuevo)" />
   <button onclick="buscar()">Buscar</button>
@@ -192,6 +226,16 @@ async function cargarWorker() {
 }
 cargarWorker();
 setInterval(cargarWorker, 30000);
+async function lanzarEvolve() {
+  const btn = document.getElementById('btn-evolve');
+  btn.disabled = true; btn.textContent = '⏳ Evolucionando...';
+  try {
+    const r = await fetch('/evolve', {method:'POST'});
+    const d = await r.json();
+    btn.textContent = d.ok ? '✅ Corriendo (~5min)' : '⚠️ Ya en curso';
+    setTimeout(() => { btn.disabled=false; btn.textContent='⚡ /evolve'; }, 300000);
+  } catch(e) { btn.disabled=false; btn.textContent='⚡ /evolve'; }
+}
 </script>
 </body>
 </html>
