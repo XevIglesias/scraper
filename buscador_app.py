@@ -135,6 +135,16 @@ REGISTRO_PARSERS = {
     ]
 }
 
+def _buscar_parser(hostname: str):
+    """Devuelve el parser para un hostname, soportando subdominios (tienda.pccomponentes.com → pccomponentes.com)."""
+    p = REGISTRO_PARSERS.get(hostname)
+    if p is not None:
+        return p
+    for dominio, parser in REGISTRO_PARSERS.items():
+        if hostname.endswith("." + dominio):
+            return parser
+    return None
+
 # Inicializar Base de Datos
 DB = PreciosDB()
 
@@ -610,7 +620,7 @@ async def analizar_url(url: str, browser, plan: dict, modo_barato: bool, query_o
         _parsed_url = _urlparse(url)
         _h = (_parsed_url.hostname or "").lower()
         dominio = _h[4:] if _h.startswith("www.") else _h
-        parser = REGISTRO_PARSERS.get(dominio)
+        parser = _buscar_parser(dominio)
 
         # ── VALIDACIÓN DE TÍTULO PRINCIPAL (H1) ──────────────────────────
         h1_elem = await page.query_selector("h1")
