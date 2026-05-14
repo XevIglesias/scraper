@@ -14,7 +14,14 @@ BASURA = {
     "genbeta", "microsiervos", "gizmodo", "engadget", "gsmarena",
     "motorpasion", "vandal", "hobbyconsolas", "muycomputer", "bandaancha",
     "adslzone", "softzone", "hardzone", "topesdegama", "andro4all", 
-    "comunidad.orange", "comunidad.movistar", "foro.vodafone"
+    "comunidad.orange", "comunidad.movistar", "foro.vodafone",
+
+    # Reacondicionados / alquiler — no son venta de nuevo
+    "refurbed", "grover.com", "back market", "backmarket", "swappie",
+    "reware", "renewed", "refurb",
+
+    # Tiendas latinoamericanas que cuelan por DDGS
+    "ktronix", "falabella", "ripley", "linio", "sodimac",
 }
 
 # Rango de precios lógicos

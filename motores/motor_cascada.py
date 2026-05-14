@@ -38,12 +38,19 @@ def _filtrar(url: str, buscar_nuevo: bool = False) -> bool:
 
     _PATRONES_LISTADO = [
         "/buscar", "/search", "/busqueda", "?q=", "/q", "search_query",
-        "category", "categoria", "listado", "browse", "/c/"
+        "category", "categoria", "listado", "browse", "/c/",
+        "/telefonia", "/moviles", "/smartphones", "/electronica", "/informatica",
     ]
     if any(p in url_lower for p in _PATRONES_LISTADO):
         if url_lower.endswith("/q") or "/search" in url_lower or "/buscar" in url_lower:
             return False
-            
+
+    # Rutas numéricas de categoría tipo /1959-telefonia — independiente de patrones
+    import re as _re
+    path = url_lower.split("?")[0]
+    if _re.search(r'/\d{3,}-[a-z]', path):
+        return False
+
     return True
 
 
