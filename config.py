@@ -18,7 +18,7 @@ BASURA = {
 
     # Reacondicionados / alquiler — no son venta de nuevo
     "refurbed", "grover.com", "back market", "backmarket", "swappie",
-    "reware", "renewed", "refurb",
+    "reware", "renewed", "refurb", "movilines",
 
     # Tiendas latinoamericanas que cuelan por DDGS
     "ktronix", "falabella", "ripley", "linio", "sodimac",

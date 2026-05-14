@@ -774,7 +774,10 @@ async def analizar_url(url: str, browser, plan: dict, modo_barato: bool, query_o
             if es_nuevo_buscado:
                 # Comprobar en texto y en URL (solo si la URL es muy específica de reacondicionado)
                 recond_texto = await detectar_reacondicionado(page, texto)
-                recond_url = "/reacondicionado" in url.lower() or "/refurbished" in url.lower()
+                recond_url = any(p in url.lower() for p in (
+                    "/reacondicionado", "/refurbished", "/como-nuevo",
+                    "/segunda-mano", "/used", "/ocasion", "/outlet",
+                ))
                 
                 if recond_texto or recond_url:
                     # Si es por URL o por una frase muy clara en texto, descartamos ya.
