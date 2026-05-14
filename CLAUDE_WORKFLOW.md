@@ -1,35 +1,54 @@
-# SKILL: Bucle de Evolución Total
+# SKILL: Bucle de Evolución Total — Fundamentos + Vanguardia
 
-Cuando el usuario diga "ejecuta la skill de evolución" o "/evolve", sigue EXACTAMENTE estas fases en orden de forma autónoma. Usa `git commit` antes de cada cambio destructivo. Si algo falla, revierta con `git restore` o `git reset --hard HEAD~1`.
+## Filosofía de evolución (leer siempre)
+
+Hay dos modos que se aplican en orden estricto:
+
+**Modo Cimientos** (hasta fitness 80/100):
+Antes de innovar, la base tiene que ser sólida. Esto significa parsers que no se rompen,
+tests que verifican cada cambio, UI que no tiene bugs visuales, código modular.
+Sin cimientos, cualquier innovación se derrumba.
+
+**Modo Vanguardia** (fitness > 80/100):
+Una vez sólida la base, ser pionero. Esto significa:
+- Ingeniería inversa de los mejores scrapers open source (Scrapy, Playwright-stealth, price-tracker repos en GitHub)
+- Buscar qué hacen los líderes del sector (Idealo, CamelCamelCamel, Keepa) y replicar lo mejor
+- Proponer mejoras que no existen todavía: parsing semántico con LLM como fallback, detección automática de cambios de DOM, alertas predictivas de precio
+
+**Retroalimentación tipo Deep Learning**:
+Cada sesión termina con una medición de fitness. La siguiente sesión lee ese resultado
+y ajusta la estrategia — igual que gradient descent. Lo que funcionó: más de eso.
+Lo que falló 2 veces: descartar y probar otro enfoque. Nunca repetir un error.
 
 ---
 
 ## FASE 0: Gestión de Tokens (SIEMPRE antes de empezar)
 
-Antes de hacer CUALQUIER cosa, evalúa el contexto disponible:
+1. Lee solo los archivos que vas a tocar en esta sesión (máximo 4).
+2. Ejecuta `python test_fitness.py` para tener la línea base.
+3. Lee `ESTADO_PROYECTO.md` — sección "Próxima sesión" si existe.
+4. Si llevas más de 20 mensajes en la conversación, crea `CHECKPOINT.md` y pide nueva sesión.
+5. Usa `/compact` antes de la Fase 3 si el contexto está cargado.
 
-1. **Estima el tamaño de la sesión**: lee solo los archivos que vas a tocar (no todos). Máximo 3-4 archivos por sesión.
-2. **Prioriza por impacto**: si el contexto es limitado, haz UNA mejora grande en vez de cinco pequeñas.
-3. **Compacta antes de la Fase 3**: antes de leer código de parsers/motores, usa `/compact` para liberar contexto.
-4. **Regla de oro**: si llevas más de 15 mensajes en la conversación, crea `CHECKPOINT.md` con el estado actual y pide al usuario que abra una conversación nueva pegando ese checkpoint.
-
-### Plantilla de CHECKPOINT.md
+### CHECKPOINT.md (plantilla)
 ```
-# Checkpoint de sesión
+# Checkpoint
 Fecha: [fecha]
-Fase completada: [0/1/2/3]
-Archivos modificados: [lista]
-Próximo paso: [descripción exacta]
-Git hash actual: [git rev-parse HEAD]
+Fitness antes: [X]/100  |  Fitness después: [Y]/100
+Fases completadas: [lista]
+Archivos modificados: [lista con git hash]
+Próximo objetivo: [descripción exacta de qué hacer]
+Git hash: [git rev-parse HEAD]
 ```
 
 ---
 
-## FASE 1: Innovador — Mercado y Planificación
+## FASE 1: Investigador — Mercado, Competencia e Ingeniería Inversa
 
-**Objetivo**: encontrar 3 mejoras concretas a implementar.
+**Objetivo**: entender qué existe, qué falta, qué es posible hacer mejor.
 
-1. Escribe y ejecuta este script temporal (bórralo después):
+### 1a. Buscar tendencias y competencia
+Escribe y ejecuta este script (bórralo después):
 ```python
 # tmp_research.py
 try:
@@ -38,108 +57,138 @@ except ImportError:
     from duckduckgo_search import DDGS
 
 queries = [
-    "python ecommerce scraper best practices 2025",
-    "tkinter customtkinter UI modern design patterns",
-    "price comparison app features 2025"
+    "best price comparison scraper python 2025 github",
+    "playwright anti-detection scraper techniques 2025",
+    "price tracker app features idealo keepa camelcamelcamel",
+    "customtkinter modern UI examples dark mode 2025",
+    "python scraper dom change detection resilient parser"
 ]
 with DDGS() as d:
     for q in queries:
-        results = list(d.text(q, max_results=2))
-        for r in results:
-            print(r.get("title",""), "|", r.get("href",""))
+        print(f"\n=== {q} ===")
+        for r in d.text(q, max_results=2):
+            print(" -", r.get("title",""), "|", r.get("href",""))
 ```
 
-2. Lee `ESTADO_PROYECTO.md` (sección de ideas pendientes).
-3. Elige **3 mejoras** ordenadas por impacto/esfuerzo. Escríbelas en `ESTADO_PROYECTO.md` bajo `## Ideas FASE 1 [fecha]`.
-4. Borra `tmp_research.py`.
-5. `git add ESTADO_PROYECTO.md && git commit -m "Fase 1: 3 ideas identificadas"`
+### 1b. Analizar competencia real
+- Busca en GitHub: `scrapy price scraper`, `playwright price tracker`, `customtkinter app`
+- Identifica: ¿qué tienen que nosotros no tenemos? ¿qué hacemos mejor?
+
+### 1c. DAFO actualizado
+Escribe en `ESTADO_PROYECTO.md` bajo `## DAFO [fecha]`:
+- Fortalezas actuales del buscador
+- Debilidades concretas (con archivo y línea)
+- Oportunidades (features que la competencia tiene y nosotros no)
+- Amenazas (anti-bot, cambios de DOM, mantenimiento de parsers)
+
+### 1d. Plan de 3 mejoras priorizadas
+Escribe en `ESTADO_PROYECTO.md` bajo `## Plan Sesión [fecha]`:
+- Mejora 1: [impacto alto, esfuerzo bajo] → Fase 2 o 3
+- Mejora 2: [impacto alto, esfuerzo medio]
+- Mejora 3: [innovación / vanguardia]
+
+Commit: `git add ESTADO_PROYECTO.md && git commit -m "Fase 1: investigacion y plan"`
 
 ---
 
-## FASE 2: Diseñador UI — Frontend
+## FASE 2: Diseñador UI — Frontend Real
 
-**Objetivo**: aplicar UNA mejora visual concreta y verificarla.
+**Objetivo**: UI que compita visualmente con apps comerciales.
 
-1. Lee `replicator/ui/interface.py` y `styles.json`.
-2. Elige la mejora visual de mayor impacto de las 3 ideas de Fase 1.
-3. Aplica el cambio. Haz commit ANTES de mostrárselo al usuario:
-   ```
-   git add -p   # solo los archivos de UI
-   git commit -m "UI: [descripción del cambio]"
-   ```
-4. Lanza la UI: `python replicator/main.py` (o `python buscador_app.py`).
-5. Pregunta al usuario: "¿Se ve bien? (sí/no/ajustar)"
-   - Si "no": `git reset --hard HEAD~1` y vuelve al paso 2 con otra idea.
-   - Si "sí": continúa a Fase 3.
+### Qué mirar para inspiración
+- CamelCamelCamel: historial de precios con gráfico
+- Idealo: cards de producto con badge "mínimo histórico"
+- Keepa: alertas visuales, sparklines de precio
+
+### Lo que puedo mejorar en CustomTkinter
+- Tema oscuro OLED real (fondo #0a0a0a, no el gris por defecto)
+- Cards de resultado con sombra, precio grande, badge de ahorro
+- Barra de progreso animada durante la búsqueda (no spinner estático)
+- Historial de precios inline (matplotlib embed o canvas simple)
+- Layout responsive: si hay 1 resultado → tarjeta grande; si hay 5 → grid
+
+### Protocolo
+1. Lee `buscador_app.py` (solo la parte de UI — clase `App` y `add_card`)
+2. Lee `styles.json`
+3. Aplica el cambio más impactante visualmente
+4. Commit antes de mostrar: `git commit -m "UI: [descripción]"`
+5. Muestra al usuario y pregunta. Si "no" → `git reset --hard HEAD~1`
 
 ---
 
-## FASE 3: Optimizador Backend — Código y Tests
+## FASE 3: Optimizador Backend — Parsers y Motor
 
-**Objetivo**: mejorar un parser o motor y verificarlo con métricas reales.
+**Objetivo**: subir la tasa de éxito de búsquedas del 50% al 80%+.
 
-### Preparación (solo una vez)
-Si no existe `test_fitness.py`, créalo:
-```python
-# test_fitness.py — mide el fitness real del buscador desde precios.db
-import sys
-sys.path.insert(0, ".")
-from replicator.core.scraper_fitness import ScraperFitness
+### Análisis de debilidades conocidas
+- `analizar_url` en buscador_app.py es monolítica (1471 líneas en un solo archivo)
+- Parsers con selectores hardcoded que rompen al cambiar el DOM
+- Sin fallback semántico cuando los selectores fallan
+- Motor cascada sin retry inteligente
 
-f = ScraperFitness()
-data = f.compute()
-print(f"FITNESS: {data['fitness']}/100")
-print(f"  Exito busquedas:   {data['tasa_exito']}%")
-print(f"  Fiab. tiendas:     {data['tasa_confianza_tiendas']}%")
-print(f"  Sin errores:       {data['tasa_sin_errores']}%")
-# Salir con codigo 1 si fitness < 50 (para CI)
-sys.exit(0 if data["fitness"] >= 50 else 1)
-```
+### Mejoras por orden de impacto
 
-### Bucle de mejora
-1. Mide fitness base: `python test_fitness.py` → guarda el número.
-2. Lee el parser/motor con peor fitness (usa `replicator/agents/scout.py` como referencia para saber cuál).
-3. Identifica UNA función concreta a mejorar (máx 80 líneas).
-4. Aplica el cambio con tu criterio completo (no un LLM local de 7B — TÚ eres el LLM).
-5. `python test_fitness.py` de nuevo.
-   - **Sube o igual + sin errores de sintaxis**: `git commit -m "Backend: [archivo] [función] +X%"`
-   - **Baja o SyntaxError**: `git restore [archivo]` y documenta por qué en `ESTADO_PROYECTO.md`.
-6. Máximo 3 intentos por función. Si falla 3 veces, pasa a la siguiente.
+**Cimientos (hacer primero):**
+1. Separar `buscador_app.py` en `ui/`, `core/`, `utils/` — sin cambiar funcionalidad
+2. Añadir selector fallback en cada parser: si el selector A falla, intentar B, luego C, luego regex
+3. Tests con HTML guardado localmente (no hace requests reales)
+
+**Vanguardia (cuando cimientos estén sólidos):**
+1. Detección automática de cambios de DOM: si el selector falla 3 veces consecutivas, usar LLM para re-detectar el selector correcto desde el HTML
+2. Playwright-stealth: rotar user-agents, delays aleatorios, fingerprint humano
+3. Parser semántico: extraer precio con regex + LLM como último recurso (ya tienes Ollama)
+4. Cache inteligente: no re-scrappear si el precio de esa tienda fue actualizado hace < 30 min
+
+### Protocolo
+1. `python test_fitness.py` → anota el número base
+2. Aplica la mejora
+3. `python test_fitness.py` de nuevo
+   - Sube: `git commit -m "Backend: [archivo] [mejora] +X%"`
+   - Baja: `git restore [archivo]` + documenta en ESTADO_PROYECTO.md
+4. Máximo 3 intentos por función. Si falla 3 veces → siguiente.
+
+---
+
+## FASE 4: Retroalimentación — Cerrar el Bucle
+
+Al final de cada sesión completa:
+
+1. Ejecuta `python test_fitness.py` → fitness final
+2. Escribe en `ESTADO_PROYECTO.md` bajo `## Sesión [fecha]`:
+   ```
+   Fitness: [antes] → [después]  (+X puntos)
+   Aplicado: [lista de cambios]
+   Fallido: [qué no funcionó y por qué]
+   Próxima sesión: [objetivo concreto basado en lo aprendido]
+   Modelo mental actualizado: [qué aprendí sobre esta app que antes no sabía]
+   ```
+3. Commit final: `git commit -m "Sesión [fecha]: fitness [antes]->[después]"`
+
+Este log ES el sistema de retroalimentación. Cada sesión nueva empieza leyendo
+la sección anterior y ajustando la estrategia — como leer el gradiente antes de
+actualizar los pesos.
 
 ---
 
 ## Reglas de seguridad absoluta
 
 - **NUNCA** toques: `replicator/core/security.py`, `replicator/agents/guardian.py`, `.env`
-- **NUNCA** hagas `git push --force` sin confirmación explícita del usuario
-- **SIEMPRE** haz `git diff` antes de un commit para verificar qué cambió
+- **NUNCA** `git push --force` sin confirmación explícita
+- **SIEMPRE** `git diff` antes de cualquier commit
 - Si el buscador deja de arrancar: `git reset --hard HEAD~1` inmediatamente
 - Si el usuario dice "esto ha quedado fatal": `git reset --hard` sin preguntar
 
 ---
 
-## Comandos de referencia rápida
+## Comandos rápidos
 
 ```bash
-# Ver qué cambió
-git diff
-git log --oneline -5
+python test_fitness.py              # medir fitness actual
+python buscador_app.py              # lanzar buscador
+python replicator/night_runner.py --cycles 2 --delta 3  # replicator local
 
-# Revertir último commit (pero mantener cambios en disco)
-git reset HEAD~1
-
-# Revertir último commit Y descartar cambios
-git reset --hard HEAD~1
-
-# Volver al commit base original
-git reset --hard b06d80f
-
-# Ver el fitness del buscador
-python test_fitness.py
-
-# Lanzar el buscador
-python buscador_app.py
-
-# Lanzar replicator manual
-python replicator/night_runner.py --cycles 2 --delta 3
+git diff                            # ver cambios pendientes
+git log --oneline -8                # historial reciente
+git reset --hard HEAD~1             # deshacer último commit
+git reset --hard b06d80f            # volver al estado base original
 ```

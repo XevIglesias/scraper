@@ -1040,57 +1040,87 @@ class ResultCard(ctk.CTkFrame):
     def __init__(self, master, dato, ranking=None, **kwargs):
         super().__init__(master, **kwargs)
         self.dato = dato
-        self.configure(fg_color="#2b2b2b", corner_radius=10, border_width=1, border_color="#3d3d3d")
+        self.configure(fg_color="#141414", corner_radius=12,
+                       border_width=1, border_color="#252525")
 
-        # Layout
         self.grid_columnconfigure(1, weight=1)
 
-        # Ranking Tag (Opcional)
-        if ranking:
-            tag_color = "#d4af37" if ranking == 1 else "#555555"
-            tag_txt = "🏆" if ranking == 1 else f" {ranking} "
-            ctk.CTkLabel(self, text=tag_txt, font=("Arial", 18, "bold"), text_color=tag_color, width=40).grid(row=0, column=0, rowspan=3, padx=10)
-
-        # Título
-        ctk.CTkLabel(self, text=dato.get("nombre_detectado", "Producto"), font=("Arial", 15, "bold"), anchor="w").grid(row=0, column=1, sticky="ew", padx=10, pady=(10, 0))
-
-        # Precio y Stock
         precio = dato.get("precio_eur", -1)
         envio  = dato.get("envio_eur", 0.0)
         total  = dato.get("total_eur", -1)
-        stock  = dato.get("stock_label", "⚠️ Stock desconocido")
-        
-        p_str = f"{precio:.2f}€" if precio > 0 else "Ver web"
-        e_str = f"{envio:.2f}€" if envio > 0 else "GRATIS"
-        t_str = f"{total:.2f}€" if total > 0 else "Ver web"
+        stock  = dato.get("stock_label", "Stock desconocido")
 
-        info_txt = f"Producto: {p_str} | Envío: {e_str} | TOTAL: {t_str}"
-        ctk.CTkLabel(self, text=info_txt, font=("Arial", 13), text_color="#aaaaaa", anchor="w").grid(row=1, column=1, sticky="ew", padx=10)
-        ctk.CTkLabel(self, text=stock, font=("Arial", 12), text_color="#5cb85c" if "✅" in stock else "#d9534f", anchor="w").grid(row=2, column=1, sticky="ew", padx=10, pady=(0, 10))
+        # ── Columna izquierda: ranking + precio total grande ──────────────
+        left = ctk.CTkFrame(self, fg_color="#0d0d0d", corner_radius=10, width=110)
+        left.grid(row=0, column=0, rowspan=4, padx=(10, 6), pady=10, sticky="ns")
+        left.grid_propagate(False)
 
-        # Histórico y Motivo
+        if ranking == 1:
+            ctk.CTkLabel(left, text="TOP", font=("Consolas", 9, "bold"),
+                         text_color="#F0C040").pack(pady=(8, 0))
+        elif ranking:
+            ctk.CTkLabel(left, text=f"#{ranking}", font=("Consolas", 10),
+                         text_color="#555555").pack(pady=(8, 0))
+
+        t_str = f"{total:.2f}" if total and total > 0 else "---"
+        ctk.CTkLabel(left, text=t_str, font=("Consolas", 20, "bold"),
+                     text_color="#F0C040" if ranking == 1 else "#f0f0f0").pack(pady=(4, 0))
+        ctk.CTkLabel(left, text="EUR total", font=("Consolas", 9),
+                     text_color="#555555").pack()
+
+        p_str = f"prod {precio:.2f}€" if precio and precio > 0 else ""
+        e_str = "env gratis" if not envio or envio == 0 else f"env {envio:.2f}€"
+        ctk.CTkLabel(left, text=f"{p_str}\n{e_str}", font=("Consolas", 9),
+                     text_color="#666666", justify="center").pack(pady=(2, 8))
+
+        # ── Columna central: nombre + tienda + stock + motivo ─────────────
+        nombre = dato.get("nombre_detectado", "Producto")
+        ctk.CTkLabel(self, text=nombre, font=("Consolas", 13, "bold"),
+                     anchor="w", wraplength=520).grid(
+                         row=0, column=1, sticky="ew", padx=10, pady=(10, 2))
+
+        dominio = dato.get("url", "").split("/")[2] if dato.get("url") else ""
+        ctk.CTkLabel(self, text=dominio, font=("Consolas", 10),
+                     text_color="#555555", anchor="w").grid(
+                         row=1, column=1, sticky="ew", padx=10)
+
+        stock_color = "#27AE60" if "stock" in stock.lower() or "disponible" in stock.lower() else "#E74C3C"
+        ctk.CTkLabel(self, text=stock, font=("Consolas", 11),
+                     text_color=stock_color, anchor="w").grid(
+                         row=2, column=1, sticky="ew", padx=10)
+
+        # Badge mínimo histórico
         try:
-            hist = DB.obtener_minimo_historico(dato.get("nombre_detectado", ""))
-            hist_txt = f"📉 Mínimo histórico: {hist['total']:.2f}€ ({hist['tienda']})" if hist and hist['total'] < total else ""
-            if hist_txt:
-                ctk.CTkLabel(self, text=hist_txt, font=("Arial", 11, "italic"), text_color="#1a7a1a", anchor="w").grid(row=3, column=1, sticky="ew", padx=10)
-        except Exception as e:
-            print(f"    [!] Error al cargar histórico en UI: {e}")
+            hist = DB.obtener_minimo_historico(nombre)
+            if hist and total and total > 0 and hist["total"] < total:
+                diff_pct = ((total - hist["total"]) / hist["total"]) * 100
+                badge = f"Min hist: {hist['total']:.2f}€  ({diff_pct:+.0f}% sobre minimo)"
+                ctk.CTkLabel(self, text=badge, font=("Consolas", 10),
+                             text_color="#27AE60", anchor="w").grid(
+                                 row=3, column=1, sticky="ew", padx=10, pady=(0, 8))
+        except Exception:
+            pass
 
-
-        # Botones
+        # ── Columna derecha: botones ───────────────────────────────────────
         btn_frm = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frm.grid(row=0, column=2, rowspan=4, padx=15)
-        
-        ctk.CTkButton(btn_frm, text="Ir a la tienda ↗", width=120, height=32, 
-                      command=lambda: self.ir_a_tienda(dato["url"])).pack(pady=4)
-        
+        btn_frm.grid(row=0, column=2, rowspan=4, padx=(6, 12), pady=10)
+
+        ctk.CTkButton(btn_frm, text="Ver tienda", width=110, height=34,
+                      font=("Consolas", 11), corner_radius=8,
+                      command=lambda: self.ir_a_tienda(dato["url"])).pack(pady=3)
+
         fb_frm = ctk.CTkFrame(btn_frm, fg_color="transparent")
         fb_frm.pack(pady=2)
-        
-        ctk.CTkButton(fb_frm, text="👍", width=40, height=32, fg_color="#2d5a27",
+
+        ctk.CTkButton(fb_frm, text="+1", width=50, height=30,
+                      font=("Consolas", 11, "bold"),
+                      fg_color="#1a4a1a", hover_color="#27AE60",
+                      corner_radius=8,
                       command=lambda: self.feedback(1)).pack(side="left", padx=2)
-        ctk.CTkButton(fb_frm, text="👎", width=40, height=32, fg_color="#5a2d2d",
+        ctk.CTkButton(fb_frm, text="-1", width=50, height=30,
+                      font=("Consolas", 11, "bold"),
+                      fg_color="#4a1a1a", hover_color="#E74C3C",
+                      corner_radius=8,
                       command=lambda: self.feedback(-1)).pack(side="left", padx=2)
 
     def ir_a_tienda(self, url):
@@ -1124,13 +1154,14 @@ class RedirigirConsola:
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("🛒 Agente Evolutivo — BUILD: EVOLVER-V2.5-AEGIS")
-        self.geometry("1000x800")
+        self.title("Agente de Compras — IA Evolutiva V3")
+        self.geometry("1100x820")
         ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("dark-blue")
         self.load_styles()
-        
         self._stop_ev = threading.Event()
         self._pause_ev = threading.Event()
+        self._build_ui()
 
     @property
     def stop_ev_flag(self):
@@ -1156,10 +1187,12 @@ class App(ctk.CTk):
 
     def load_styles(self):
         _defaults = {
-            "bg_color": "#1a1a1a", "card_color": "#2d2d2d",
-            "text_color": "#ffffff", "accent_color": "#8E44AD",
-            "accent_hover": "#9B59B6", "button_radius": 8,
-            "font_family": "Consolas", "title_size": 24,
+            "bg_color": "#0d0d0d", "card_color": "#161616",
+            "card_border": "#2a2a2a", "text_color": "#f0f0f0",
+            "text_muted": "#888888", "accent_color": "#7B2FBE",
+            "accent_hover": "#9B59B6", "success_color": "#27AE60",
+            "danger_color": "#E74C3C", "gold_color": "#F0C040",
+            "button_radius": 10, "font_family": "Consolas", "title_size": 24,
         }
         try:
             _styles_path = pathlib.Path(__file__).parent / "styles.json"
@@ -1171,103 +1204,127 @@ class App(ctk.CTk):
         except Exception:
             self.styles = _defaults
 
-    def apply_dynamic_styles(self):
-        self.configure(fg_color=self.styles.get("bg_color", "#1a1a1a"))
-        if hasattr(self, 'lbl_status'):
-            self.lbl_status.configure(text_color=self.styles.get("accent_color", "#8E44AD"))
-        # Aplicar a botones principales
-        for btn in [self.btn_buscar, self.btn_barato, self.btn_entrenar, self.btn_evolucionar]:
-            btn.configure(fg_color=self.styles.get("accent_color", "#8E44AD"),
-                          corner_radius=self.styles.get("button_radius", 8))
-        print("[🎨] UI Refrescada con nuevo ADN visual.")
+    def _build_ui(self):
+        """Construye la UI una sola vez. Llamar solo desde __init__."""
+        s = self.styles
+        accent = s.get("accent_color", "#7B2FBE")
+        bg     = s.get("bg_color", "#0d0d0d")
+        radius = s.get("button_radius", 10)
 
+        self.configure(fg_color=bg)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(2, weight=1)
 
-        ctk.CTkLabel(self, text="🛒 Agente de Compras con IA — Powered by DuckDuckGo + Ollama",
-                     font=("Consolas", 17, "bold")).grid(row=0, column=0, pady=(18, 4))
+        ctk.CTkLabel(self, text="Agente de Compras con IA  —  DuckDuckGo + Playwright + Ollama",
+                     font=("Consolas", 15, "bold"), text_color=s.get("text_muted", "#888888")
+                     ).grid(row=0, column=0, pady=(14, 4))
 
-        frm = ctk.CTkFrame(self)
-        frm.grid(row=1, column=0, padx=20, pady=8, sticky="ew")
+        frm = ctk.CTkFrame(self, fg_color=s.get("card_color", "#161616"),
+                           corner_radius=12, border_width=1,
+                           border_color=s.get("card_border", "#2a2a2a"))
+        frm.grid(row=1, column=0, padx=20, pady=6, sticky="ew")
         frm.grid_columnconfigure(0, weight=1)
 
-        self.entrada = ctk.CTkEntry(frm, height=46, font=("Consolas", 14),
-                                    placeholder_text="¿Qué buscas? Ej: iPhone 15 Pro 256GB, Scitec proteína fresa 2kg...")
+        self.entrada = ctk.CTkEntry(frm, height=44, font=("Consolas", 14),
+                                    fg_color="#0d0d0d", border_color="#3a3a3a",
+                                    placeholder_text="¿Qué buscas? Ej: iPhone 15 Pro 256GB, proteína fresa 2kg...")
         self.entrada.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
         self.entrada.bind("<Return>", lambda _: self.buscar(False))
 
         bfrm = ctk.CTkFrame(frm, fg_color="transparent")
         bfrm.grid(row=0, column=1, padx=4)
 
-        self.btn_buscar = ctk.CTkButton(bfrm, text="🔍 Buscar", width=130, height=46,
+        self.btn_buscar = ctk.CTkButton(bfrm, text="Buscar", width=120, height=44,
                                          font=("Consolas", 13, "bold"),
+                                         fg_color=accent, hover_color=s.get("accent_hover", "#9B59B6"),
+                                         corner_radius=radius,
                                          command=lambda: self.buscar(False))
         self.btn_buscar.grid(row=0, column=0, padx=4)
 
-        self.btn_barato = ctk.CTkButton(bfrm, text="💸 Más Barato", width=140, height=46,
+        self.btn_barato = ctk.CTkButton(bfrm, text="Mas Barato", width=120, height=44,
                                          font=("Consolas", 13, "bold"),
-                                         fg_color="#1a7a1a", hover_color="#145214",
+                                         fg_color=s.get("success_color", "#27AE60"),
+                                         hover_color="#1E8449",
+                                         corner_radius=radius,
                                          command=lambda: self.buscar(True))
         self.btn_barato.grid(row=0, column=1, padx=4)
 
-        self.btn_limpiar = ctk.CTkButton(bfrm, text="🗑️ Limpiar Historial", width=140, height=46,
+        self.btn_limpiar = ctk.CTkButton(bfrm, text="Limpiar DB", width=110, height=44,
                                           font=("Consolas", 11),
-                                          fg_color="#444444", hover_color="#666666",
+                                          fg_color="#2a2a2a", hover_color="#3a3a3a",
+                                          corner_radius=radius,
                                           command=self.limpiar_db)
         self.btn_limpiar.grid(row=0, column=2, padx=4)
-        
-        self.btn_entrenar = ctk.CTkButton(bfrm, text="🏋️ Autoentreno", width=140, height=46,
+
+        self.btn_entrenar = ctk.CTkButton(bfrm, text="Autoentreno", width=120, height=44,
                                            font=("Consolas", 11),
-                                           fg_color="#D35400", hover_color="#E67E22",
+                                           fg_color="#C0392B", hover_color="#E74C3C",
+                                           corner_radius=radius,
                                            command=self.start_training)
         self.btn_entrenar.grid(row=1, column=2, padx=4, pady=5)
 
-        self.btn_evolucionar = ctk.CTkButton(bfrm, text="🚀 Iniciar Evolución", width=140, height=46,
+        self.btn_evolucionar = ctk.CTkButton(bfrm, text="Evolucion", width=120, height=44,
                                            font=("Consolas", 11, "bold"),
-                                           fg_color="#8E44AD", hover_color="#9B59B6",
+                                           fg_color=accent, hover_color=s.get("accent_hover", "#9B59B6"),
+                                           corner_radius=radius,
                                            command=self.start_evolution)
         self.btn_evolucionar.grid(row=1, column=0, padx=4, pady=5)
 
-        self.btn_stop_ev = ctk.CTkButton(bfrm, text="⏹ Detener Evo", width=130, height=46,
+        self.btn_stop_ev = ctk.CTkButton(bfrm, text="Detener", width=100, height=44,
                                           font=("Consolas", 11),
-                                          fg_color="#7B241C", hover_color="#922B21",
+                                          fg_color="#5a1a1a", hover_color="#7B241C",
+                                          corner_radius=radius,
                                           state="disabled",
                                           command=self.stop_evolution)
         self.btn_stop_ev.grid(row=1, column=3, padx=4, pady=5)
 
-        self.btn_pausa = ctk.CTkButton(bfrm, text="⏸ Pausar", width=100, height=46,
+        self.btn_pausa = ctk.CTkButton(bfrm, text="Pausar", width=100, height=44,
                                            font=("Consolas", 11, "bold"),
-                                           fg_color="#D4AC0D", hover_color="#F1C40F",
+                                           fg_color="#7D6608", hover_color="#D4AC0D",
+                                           corner_radius=radius,
                                            command=self.toggle_pause)
         self.btn_pausa.grid(row=1, column=1, padx=4, pady=5)
 
-        self.btn_apagar = ctk.CTkButton(bfrm, text="🔴 APAGAR", width=100, height=46,
+        self.btn_apagar = ctk.CTkButton(bfrm, text="APAGAR", width=100, height=44,
                                            font=("Consolas", 11, "bold"),
-                                           fg_color="#7B241C", hover_color="#922B21",
+                                           fg_color="#5a1a1a", hover_color="#7B241C",
+                                           corner_radius=radius,
                                            command=self.shutdown_total)
         self.btn_apagar.grid(row=1, column=2, padx=4, pady=5)
 
-
-
-
         self.var_autoaprendizaje = ctk.BooleanVar(value=True)
-        ctk.CTkCheckBox(frm, text="🚀 Autoaprendizaje Activo", variable=self.var_autoaprendizaje,
-                        font=("Consolas", 11)).grid(row=2, column=0, columnspan=2, pady=5, sticky="w")
+        ctk.CTkCheckBox(frm, text="Autoaprendizaje activo", variable=self.var_autoaprendizaje,
+                        font=("Consolas", 11), checkmark_color=accent
+                        ).grid(row=2, column=0, columnspan=2, pady=5, sticky="w", padx=10)
 
-
-
-
-        # Área de Resultados (Cards)
+        # Area de resultados
         self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        self.scroll.grid(row=2, column=0, padx=20, pady=(0, 10), sticky="nsew")
+        self.scroll.grid(row=2, column=0, padx=20, pady=(0, 6), sticky="nsew")
 
         # Barra de estado
-        self.lbl_status = ctk.CTkLabel(self, text="Sistema listo.", font=("Consolas", 11), anchor="w")
+        self.lbl_status = ctk.CTkLabel(self, text="Sistema listo.", font=("Consolas", 11),
+                                        anchor="w", text_color=s.get("text_muted", "#888888"))
         self.lbl_status.grid(row=3, column=0, padx=20, pady=(0, 2), sticky="ew")
 
-        # Consola (Minimizada)
-        self.consola = ctk.CTkTextbox(self, font=("Consolas", 11), state="disabled", height=80)
+        # Consola
+        self.consola = ctk.CTkTextbox(self, font=("Consolas", 10), state="disabled", height=72,
+                                       fg_color="#050505", text_color="#5a9a5a")
         self.consola.grid(row=4, column=0, padx=20, pady=(0, 10), sticky="ew")
 
         sys.stdout = RedirigirConsola(self.consola)
+
+    def apply_dynamic_styles(self):
+        """Actualiza estilos en caliente. NO crea widgets nuevos."""
+        if not hasattr(self, 'lbl_status'):
+            return  # UI todavia no construida
+        s = self.styles
+        accent = s.get("accent_color", "#7B2FBE")
+        self.configure(fg_color=s.get("bg_color", "#0d0d0d"))
+        self.lbl_status.configure(text_color=s.get("text_muted", "#888888"))
+        for btn in [self.btn_buscar, self.btn_evolucionar]:
+            btn.configure(fg_color=accent, hover_color=s.get("accent_hover", "#9B59B6"),
+                          corner_radius=s.get("button_radius", 10))
+        print("[UI] Estilos actualizados.")
 
     def limpiar_db(self):
         try:

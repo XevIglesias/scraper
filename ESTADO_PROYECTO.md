@@ -4,6 +4,27 @@
 
 ---
 
+## DAFO 2026-05-14
+
+| | |
+|---|---|
+| **Fortalezas** | Motor cascada DDGS→Bing→Fallback; parsers especializados por tienda; JSON-LD como primera fuente de precio; historial de precios en SQLite; feedback 👍👎 integrado |
+| **Debilidades** | Fitness 55/100; `apply_dynamic_styles` crea widgets duplicados (bug crítico); `buscador_app.py` monolítico 1471 líneas; parsers con selectores únicos (sin fallback); `MODELO_OLLAMA="llama3"` hardcodeado; 0 tests automatizados |
+| **Oportunidades** | `Scrapling` para parsers adaptativos que sobreviven cambios de DOM; historial de precios con gráfico inline; alertas de precio por umbral; playlist de Playwright-stealth con XDriver; exportar CSV/Excel |
+| **Amenazas** | Amazon/MediaMarkt cambian DOM cada 2-3 meses; Cloudflare bloquea scrapers sin stealth; `playwright-stealth` abandonado en 2024 |
+
+## Plan Sesión 2026-05-14
+
+- **Mejora 1** [impacto alto, esfuerzo bajo]: Tema OLED real + fix bug widgets duplicados + ResultCard con precio grande
+- **Mejora 2** [impacto alto, esfuerzo medio]: Parsers con arrays de selectores fallback (concepto Scrapling manual)
+- **Mejora 3** [vanguardia]: Detección automática DOM — si un selector falla 3 veces, marcar en DB para re-análisis
+
+## Sesión 2026-05-14 — En progreso
+
+Fitness base: 55.0/100
+
+---
+
 ## 1. ARQUITECTURA ACTUAL
 
 ```

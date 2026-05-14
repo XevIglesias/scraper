@@ -39,14 +39,39 @@ class TiendaParser(ABC):
         """Prueba selectores en orden y devuelve el primer texto encontrado."""
         for sel in selectores:
             try:
-                el = await page.query_selector(sel)
-                if el:
-                    t = await el.inner_text()
-                    if t and t.strip():
-                        return t.strip()
+                # Soporte para lista de selectores CSS alternativos separados por |
+                partes = [s.strip() for s in sel.split("|")]
+                for parte in partes:
+                    el = await page.query_selector(parte)
+                    if el:
+                        t = await el.inner_text()
+                        if t and t.strip():
+                            return t.strip()
             except Exception:
                 continue
         return None
+
+    async def _precio_json_ld(self, page) -> float:
+        """Extrae precio desde JSON-LD (schema.org) — el mas fiable y resistente a cambios de DOM."""
+        try:
+            precio = await page.evaluate("""() => {
+                for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
+                    try {
+                        const d = JSON.parse(s.textContent);
+                        const offers = d.offers || (d['@graph'] || []).map(x => x.offers).find(Boolean);
+                        if (offers) {
+                            const p = offers.price || offers.lowPrice;
+                            if (p) return parseFloat(String(p).replace(',', '.'));
+                        }
+                    } catch {}
+                }
+                return null;
+            }""")
+            if precio and 0.5 < float(precio) < 100000:
+                return float(precio)
+        except Exception:
+            pass
+        return -1.0
 
     async def _attr(self, page, selector: str, attr: str) -> str | None:
         """Devuelve el atributo de un elemento CSS."""

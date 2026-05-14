@@ -1,10 +1,15 @@
 {
-    "bg_color": "#1a1a1a",
-    "card_color": "#2d2d2d",
-    "text_color": "#ffffff",
-    "accent_color": "#8E44AD",
+    "bg_color": "#0d0d0d",
+    "card_color": "#161616",
+    "card_border": "#2a2a2a",
+    "text_color": "#f0f0f0",
+    "text_muted": "#888888",
+    "accent_color": "#7B2FBE",
     "accent_hover": "#9B59B6",
-    "button_radius": 8,
+    "success_color": "#27AE60",
+    "danger_color": "#E74C3C",
+    "gold_color": "#F0C040",
+    "button_radius": 10,
     "font_family": "Consolas",
     "title_size": 24
 }

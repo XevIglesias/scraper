@@ -11,37 +11,50 @@ class AmazonParser(TiendaParser):
     dominio = "amazon.es"
     plataforma = "Custom"
 
+    # Selectores de precio ordenados por fiabilidad (2025).
+    # Si Amazon cambia el DOM, añadir el nuevo selector aquí sin tocar nada más.
+    _PRICE_SELECTORS = [
+        ".a-price.priceToPay .a-offscreen",  # precio "paga ahora" (más fiable)
+        ".a-price.apexPriceToPay .a-offscreen",
+        "#corePriceDisplay_desktop_feature_div .a-offscreen",
+        ".a-price .a-offscreen",             # fallback genérico
+        "#priceblock_ourprice",              # legacy
+        "#priceblock_dealprice",
+        ".a-price-whole",                    # solo entero (último recurso)
+    ]
+
     async def parse(self, page) -> ResultadoParser:
-        # Amazon tiene selectores muy variados según la categoría
         nombre = await self._texto(page,
             "#productTitle",
+            "#title span",
+            "h1.a-size-large",
             "h1",
-            ".qa-title-text"
         ) or "Amazon.es"
 
-        # Amazon usa .a-price-whole y .a-price-fraction para el precio principal
-        # Pero a veces está en un input o en un meta
-        precio_entero = await self._texto(page, ".a-price-whole")
-        precio_decimal = await self._texto(page, ".a-price-fraction")
-        
-        if precio_entero:
-            # Limpiamos el punto de miles si existe
-            precio_txt = precio_entero.replace(".", "").replace(",", ".")
-            if precio_decimal:
-                precio_txt += f".{precio_decimal}"
-            precio = self._parse_precio(precio_txt)
-        else:
-            # Fallback a selectores de oferta o secundarios
-            precio_txt = await self._texto(page, ".apexPriceToPay", ".priceToPay", "#priceblock_ourprice")
-            precio = self._parse_precio(precio_txt)
+        # 1. JSON-LD primero (más resistente a cambios DOM)
+        precio = await self._precio_json_ld(page)
+
+        # 2. Selectores CSS con fallback en cascada
+        if precio <= 0:
+            for sel in self._PRICE_SELECTORS:
+                txt = await self._texto(page, sel)
+                if txt:
+                    precio = self._parse_precio(txt)
+                    if precio > 0:
+                        break
+
+        # 3. Detectar stock por botón de añadir al carrito
+        en_stock = await self._existe(page, "#add-to-cart-button:not([disabled])")
+        if precio > 0 and not en_stock:
+            en_stock = True  # precio visible = producto disponible
 
         return ResultadoParser(
             nombre=nombre.strip(),
             precio=precio,
-            envio=0.0, # Amazon suele ser Prime/Gratis o variable
-            en_stock=precio > 0,
-            stock_label="✅ En stock" if precio > 0 else "❌ Agotado",
-            fuente="Amazon.es (Parser)"
+            envio=0.0,
+            en_stock=en_stock,
+            stock_label="En stock" if en_stock else "Agotado",
+            fuente="Amazon.es (Parser)",
         )
 
 
