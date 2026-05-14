@@ -122,7 +122,7 @@ async def listar_alertas():
 @app.get("/worker/status")
 async def worker_status():
     from replicator.core.scraper_fitness import ScraperFitness
-    fitness = ScraperFitness().calcular()
+    fitness = ScraperFitness().compute().get("total", 55.0)
     return {**get_estado(), "fitness": round(fitness, 1)}
 
 
