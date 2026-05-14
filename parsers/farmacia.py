@@ -23,19 +23,21 @@ class PrestaShopFarmaciaParser(TiendaParser):
         ) or "Producto farmacia"
 
         # ── Precio ────────────────────────────────────────────────────
-        # PrestaShop estándar: precio con IVA en span.current-price
-        precio_txt = await self._texto(page,
-            "span.current-price-value",
-            "[itemprop='price']",
-            "span.price",
-            ".product-price",
-            "#our_price_display",
-        )
-        # Fallback: atributo content del microdata
-        if not precio_txt:
-            precio_txt = await self._attr(page, "[itemprop='price']", "content")
-
-        precio = self._parse_precio(precio_txt)
+        # 1ª fuente: JSON-LD (schema.org) — resistente a cambios de DOM
+        precio = await self._precio_json_ld(page)
+        if precio < 0:
+            precio_txt = await self._texto(page,
+                "span.current-price-value",
+                "[itemprop='price']",
+                "span.price",
+                ".product-price",
+                "#our_price_display",
+                "[class*='product-price']",
+                "[class*='current-price']",
+            )
+            if not precio_txt:
+                precio_txt = await self._attr(page, "[itemprop='price']", "content")
+            precio = self._parse_precio(precio_txt)
 
         # ── Envío ──────────────────────────────────────────────────────
         envio_txt = await self._texto(page,

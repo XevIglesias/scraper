@@ -20,15 +20,19 @@ class WooCommerceSupParser(TiendaParser):
             "h1",
         ) or "Suplemento"
 
-        precio_txt = await self._texto(page,
-            ".woocommerce-Price-amount.amount bdi",
-            "p.price ins .woocommerce-Price-amount",
-            "p.price .woocommerce-Price-amount",
-            "[itemprop='price']",
-        )
-        if not precio_txt:
-            precio_txt = await self._attr(page, "[itemprop='price']", "content")
-        precio = self._parse_precio(precio_txt)
+        precio = await self._precio_json_ld(page)
+        if precio < 0:
+            precio_txt = await self._texto(page,
+                ".woocommerce-Price-amount.amount bdi",
+                "p.price ins .woocommerce-Price-amount",
+                "p.price .woocommerce-Price-amount",
+                "[itemprop='price']",
+                "[class*='price'] bdi",
+                "[class*='price'] span",
+            )
+            if not precio_txt:
+                precio_txt = await self._attr(page, "[itemprop='price']", "content")
+            precio = self._parse_precio(precio_txt)
 
         # Envío en WooCommerce suele aparecer en tabla de checkout, no en producto
         envio = 0.0
@@ -86,14 +90,16 @@ class MyProteinParser(TiendaParser):
             "h1",
         ) or "MyProtein"
 
-        precio_txt = await self._texto(page,
-            "p.productPrice_price",
-            "[data-product-price]",
-            ".productPrice",
-        )
-        if not precio_txt:
-            precio_txt = await self._attr(page, "[itemprop='price']", "content")
-        precio = self._parse_precio(precio_txt)
+        precio = await self._precio_json_ld(page)
+        if precio < 0:
+            precio_txt = await self._texto(page,
+                "p.productPrice_price",
+                "[data-product-price]",
+                ".productPrice",
+            )
+            if not precio_txt:
+                precio_txt = await self._attr(page, "[itemprop='price']", "content")
+            precio = self._parse_precio(precio_txt)
 
         agotado = await self._existe(page, ".athenaProductVariations_soldOut")
         disponible = await self._existe(page, "button[data-product-id]")
@@ -118,11 +124,13 @@ class ProzisParser(TiendaParser):
 
     async def parse(self, page) -> ResultadoParser:
         nombre = await self._texto(page, "h1.product-name", "h1") or "Prozis"
-        precio_txt = (
-            await self._texto(page, ".product-price .price", ".price-value") or
-            await self._attr(page, "[itemprop='price']", "content")
-        )
-        precio = self._parse_precio(precio_txt)
+        precio = await self._precio_json_ld(page)
+        if precio < 0:
+            precio_txt = (
+                await self._texto(page, ".product-price .price", ".price-value") or
+                await self._attr(page, "[itemprop='price']", "content")
+            )
+            precio = self._parse_precio(precio_txt)
         agotado = await self._existe(page, ".out-of-stock-label")
         disponible = await self._existe(page, "button.add-to-cart:not([disabled])")
         if agotado:
