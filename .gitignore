@@ -1,0 +1,39 @@
+# Secretos y configuración local
+.env
+
+# Bases de datos
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+
+# Replicator: snapshots y estado de runtime (no van a git — git ES el control de versiones)
+replicator/snapshots/
+replicator/reports/
+replicator/tmp/
+replicator/.fix_count
+replicator/.restart_needed
+replicator/.circuit_state.json

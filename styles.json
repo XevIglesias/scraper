@@ -1,0 +1,10 @@
+{
+    "bg_color": "#1a1a1a",
+    "card_color": "#2d2d2d",
+    "text_color": "#ffffff",
+    "accent_color": "#8E44AD",
+    "accent_hover": "#9B59B6",
+    "button_radius": 8,
+    "font_family": "Consolas",
+    "title_size": 24
+}
