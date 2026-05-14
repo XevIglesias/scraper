@@ -4,6 +4,32 @@
 
 ---
 
+## Sesión 2026-05-14 (Sesión 3) — Completada
+
+Fitness: 55.0 → 55.0 (DB-driven, sin búsquedas reales)
+
+**Aplicado:**
+- `buscador_app.py`: stealth anti-bot — rotar user-agent/viewport aleatorio; `navigator.webdriver=undefined`; simular plugins/languages. Botón "Alerta" con CTkInputDialog. Botón "Historial" con gráfico matplotlib OLED embebido.
+- `db.py`: `obtener_historial_precios()` con búsqueda LIKE segura y ORDER BY timestamp.
+- `parsers/farmacia.py`: `_precio_json_ld()` como fuente primaria antes de selectores CSS. Dos selectores CSS adicionales.
+- `parsers/suplementos.py`: misma mejora en WooCommerceSupParser, MyProteinParser y ProzisParser.
+- `replicator/run_evolution.py`: runner headless del ciclo evolutivo (auto_approve=True, sin UI).
+- `replicator/core/evolution_engine.py`: confirmado operativo — Engine instancia correctamente.
+
+**Fallido:** Nada.
+
+**Próxima sesión:**
+- Hacer búsquedas reales con el buscador para medir si el fitness sube (necesita datos DB).
+- Exportar CSV/Excel de resultados — feature de alta demanda.
+- Explorar `generalista.py` (Carrefour, El Corte Inglés) con JSON-LD — mismo patrón.
+- Correr `python replicator/run_evolution.py` para un ciclo evolutivo automático completo.
+
+**Modelo mental actualizado:**
+El stealth con navigator.webdriver=undefined y rotar user-agents/viewports es la mejora más impactante para evitar bloqueos de Cloudflare. Las alertas y el historial gráfico completan el ciclo de valor del buscador (buscar → guardar → alertar → graficar).
+
+
+---
+
 ## DAFO 2026-05-14
 
 | | |
