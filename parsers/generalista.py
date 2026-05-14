@@ -16,17 +16,17 @@ class CarrefourParser(TiendaParser):
             "h1",
         ) or "Carrefour"
 
-        # Carrefour tiene el precio en un formato complejo a veces
-        precio_txt = await self._texto(page,
-            ".buybox__price",
-            ".product-header__price",
-            "span.price",
-            "[itemprop='price']",
-        )
-        if not precio_txt:
-            precio_txt = await self._attr(page, "[itemprop='price']", "content")
-        
-        precio = self._parse_precio(precio_txt)
+        precio = await self._precio_json_ld(page)
+        if precio < 0:
+            precio_txt = await self._texto(page,
+                ".buybox__price",
+                ".product-header__price",
+                "span.price",
+                "[itemprop='price']",
+            )
+            if not precio_txt:
+                precio_txt = await self._attr(page, "[itemprop='price']", "content")
+            precio = self._parse_precio(precio_txt)
 
         # Envío en Carrefour suele variar por CP, intentamos capturar base
         envio_txt = await self._texto(page, ".shipping-cost", ".delivery-price")
@@ -60,15 +60,16 @@ class ElCorteInglesParser(TiendaParser):
             "h1",
         ) or "El Corte Inglés"
 
-        precio_txt = await self._texto(page,
-            "span.price.sale",
-            "span.price",
-            ".product-price",
-        )
-        if not precio_txt:
-            precio_txt = await self._attr(page, "[itemprop='price']", "content")
-        
-        precio = self._parse_precio(precio_txt)
+        precio = await self._precio_json_ld(page)
+        if precio < 0:
+            precio_txt = await self._texto(page,
+                "span.price.sale",
+                "span.price",
+                ".product-price",
+            )
+            if not precio_txt:
+                precio_txt = await self._attr(page, "[itemprop='price']", "content")
+            precio = self._parse_precio(precio_txt)
 
         envio = 0.0 # ECI suele ocultar envío hasta el carrito o por compra mínima
 

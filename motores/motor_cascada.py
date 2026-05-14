@@ -13,7 +13,10 @@ from ddgs import DDGS
 from motores.motor_bing import buscar_bing
 from motores.motor_fallback import get_fallback_urls
 from config import BASURA, MIN_URLS_ACEPTABLE, MAX_URLS_TOTAL
+from db import PreciosDB
 
+_DB = PreciosDB()  # singleton — evita crear una conexión nueva por cada URL filtrada
+_DOMINIOS_BLOQUEADOS = frozenset([".ar", ".mx", ".cl", ".co", ".pe", ".ve", ".uy", ".br", ".us"])
 
 
 def _filtrar(url: str, buscar_nuevo: bool = False) -> bool:
@@ -21,38 +24,23 @@ def _filtrar(url: str, buscar_nuevo: bool = False) -> bool:
     if not url or not url.startswith("http"):
         return False
     url_lower = url.lower()
-    
-    # 1. Filtro de dominios basura (Config.py)
+
     if any(b in url_lower for b in BASURA):
         return False
-        
-    # Bloqueo de dominios fuera de EUROPA/ESPAÑA (Evitar pesos argentinos, etc.)
-    DOMINIOS_BLOQUEADOS = [".ar", ".mx", ".cl", ".co", ".pe", ".ve", ".uy", ".br", ".us"]
-    if any(url_lower.endswith(d) or f"{d}/" in url_lower for d in DOMINIOS_BLOQUEADOS):
+
+    if any(url_lower.endswith(d) or f"{d}/" in url_lower for d in _DOMINIOS_BLOQUEADOS):
         return False
 
-        
-    # 2. Filtro de REPUTACIÓN (Aprendizaje continuo)
-    # Evita entrar en sitios que ya sabemos que son "Solo Reacondicionados"
-    from db import PreciosDB
-    db = PreciosDB()
     dominio = url.split("/")[2].replace("www.", "")
-    if db.es_tienda_bloqueada(dominio, buscar_nuevo):
+    if _DB.es_tienda_bloqueada(dominio, buscar_nuevo):
         print(f"    [!] Salto automático (Reputación): {dominio} es solo reacondicionados.")
         return False
 
-    # 3. Filtro de páginas de búsqueda (Listados basura)
-
-    # Evitamos que el scraper entre en un bucle de listados en lugar de ver el producto
-    PATRONES_LISTADO = [
+    _PATRONES_LISTADO = [
         "/buscar", "/search", "/busqueda", "?q=", "/q", "search_query",
         "category", "categoria", "listado", "browse", "/c/"
     ]
-    # Excepción: no filtrar si el patrón es parte del nombre de un producto legítimo 
-    # (muy raro en la estructura de URL de ecommerce modernos)
-    if any(p in url_lower for p in PATRONES_LISTADO):
-        # Doble check: las URLs de producto suelen terminar en .html o tener IDs largos
-        # Si termina en /q o /search, es casi seguro un listado
+    if any(p in url_lower for p in _PATRONES_LISTADO):
         if url_lower.endswith("/q") or "/search" in url_lower or "/buscar" in url_lower:
             return False
             

@@ -70,17 +70,19 @@ class PcComponentesParser(TiendaParser):
             "h1",
         ) or "PcComponentes"
 
-        precio_txt = (
-            await self._texto(page,
-                "[data-price]",
-                ".price-container .price",
-                ".product-price",
-                "#precio-main",
-            ) or
-            await self._attr(page, "[itemprop='price']", "content") or
-            await self._attr(page, "[data-price]", "data-price")
-        )
-        precio = self._parse_precio(precio_txt)
+        precio = await self._precio_json_ld(page)
+        if precio < 0:
+            precio_txt = (
+                await self._texto(page,
+                    "[data-price]",
+                    ".price-container .price",
+                    ".product-price",
+                    "#precio-main",
+                ) or
+                await self._attr(page, "[itemprop='price']", "content") or
+                await self._attr(page, "[data-price]", "data-price")
+            )
+            precio = self._parse_precio(precio_txt)
 
         agotado = (
             await self._existe(page, ".out-of-stock") or
@@ -114,15 +116,17 @@ class MediaMarktParser(TiendaParser):
             "h1",
         ) or "MediaMarkt"
 
-        precio_txt = (
-            await self._texto(page,
-                "[data-test='product-price'] span",
-                ".price span",
-                "[class*='Price'] span",
-            ) or
-            await self._attr(page, "[itemprop='price']", "content")
-        )
-        precio = self._parse_precio(precio_txt)
+        precio = await self._precio_json_ld(page)
+        if precio < 0:
+            precio_txt = (
+                await self._texto(page,
+                    "[data-test='product-price'] span",
+                    ".price span",
+                    "[class*='Price'] span",
+                ) or
+                await self._attr(page, "[itemprop='price']", "content")
+            )
+            precio = self._parse_precio(precio_txt)
 
         agotado = await self._existe(page, "[data-test='out-of-stock']")
         disponible = await self._existe(page, "[data-test='add-to-cart']:not([disabled])")
@@ -152,15 +156,17 @@ class FnacParser(TiendaParser):
             "h1",
         ) or "Fnac"
 
-        precio_txt = (
-            await self._texto(page,
-                ".userPrice .finalPrice",
-                ".f-priceBox-price",
-                ".Article-price",
-            ) or
-            await self._attr(page, "[itemprop='price']", "content")
-        )
-        precio = self._parse_precio(precio_txt)
+        precio = await self._precio_json_ld(page)
+        if precio < 0:
+            precio_txt = (
+                await self._texto(page,
+                    ".userPrice .finalPrice",
+                    ".f-priceBox-price",
+                    ".Article-price",
+                ) or
+                await self._attr(page, "[itemprop='price']", "content")
+            )
+            precio = self._parse_precio(precio_txt)
 
         agotado = await self._existe(page, ".Article-stockLabel--outOfStock")
         disponible = await self._existe(page, ".f-buyBox-addToCart:not([disabled])")
